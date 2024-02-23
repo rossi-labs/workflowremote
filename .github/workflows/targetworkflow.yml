@@ -35,3 +35,13 @@ jobs:
         
       - name: list K6 artifact
         run: ls -ilha .
+
+      - name: Run K6 test
+        run: mkdir ./logs && echo "k6_test_log-${{ github.run_id }}"  > ./logs/k6_test.log
+      
+      - name: Archive test logs
+        uses: actions/upload-artifact@v4
+        id: logs-k6-upload
+        with:
+          name: k6test_logs-${{ github.run_id }}
+          path: logs
