@@ -43,16 +43,39 @@ jobs:
             https://api.github.com/repos/$repo_owner/$repo_name/dispatches \
             -d "{\"event_type\": \"$event_type\", \"client_payload\": {\"artifactURL\": \"$artifactURL\", \"distinct_id\": \"$distinct_id\"}}"     
 
-      - name: Ger remote workflow status 
+      - name: Get remote workflow status 
         run: |
           repo_owner="rossi-labs" 
           repo_name="worflowremote"  
           distinct_id="${{ github.run_id }}"
+          completed=false
           
           sleep 10 && \
-          curl -L \
+          remote_distinct_id=$(curl -L \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.access-token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/$repo_owner/$repo_name/actions/workflows/85381483/runs \
-            | jq -r ".workflow_runs[] |select(.name | contains(\"$distinct_id\")) | .id"
+            https://api.github.com/repos/$repo_owner/$repo_name/actions/workflows/87084376/runs \
+            | jq -r ".workflow_runs[] |select(.name | contains(\"$distinct_id\")) | .id") && \
+          for i in {1..30}; do # Tentativa de 30 vezes com espera de 5 segundos entre elas.
+          echo "Checking workflow run status attempt $i"
+          status=$(curl -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.access-token }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/$repo_owner/$repo_name/actions/runs/$remote_distinct_id | jq -r ".status")
+      
+          if [[ "$status" == "completed" ]]; then
+              echo "Workflow completed"
+              break
+          else
+              echo "Workflow status: $status. Waiting..."
+              sleep 5
+          fi
+          done
+          
+          if [[ "$status" != "completed" ]]; then
+              echo "Workflow did not complete in time"
+              exit 1
+          fi
+        
